@@ -3,13 +3,12 @@
 <head>
   <meta charset="utf-8" />
   <title>Mapa 3D - Energia Medianeira PR</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <!-- Biblioteca MapLibre GL JS (Gratuita e Open Source) -->
-  <script src="https://unpkg.com"></script>
-  <link href="https://unpkg.com" rel="stylesheet" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <script src="https://jsdelivr.net"></script>
+  <link href="https://jsdelivr.net" rel="stylesheet" />
   <style>
-    body { margin: 0; padding: 0; }
-    #map { position: absolute; top: 0; bottom: 0; width: 100%; }
+    html, body { margin: 0; padding: 0; width: 100%; height: 100%; background: #111; overflow: hidden; }
+    #map { position: fixed; top: 0; left: 0; right: 0; bottom: 0; width: 100%; height: 100%; }
   </style>
 </head>
 <body>
@@ -18,20 +17,16 @@
   <script>
     const map = new maplibregl.Map({
       container: 'map',
-      // Estilo gratuito com prédios 3D já configurados (OpenFreeMap)
       style: 'https://openfreemap.org',
-      // Coordenadas do centro de Medianeira - PR
       center: [-54.0942, -25.2953],
       zoom: 15.5,
-      pitch: 60, // Inclinação da câmera para ver em 3D
-      bearing: -20, // Rotação do mapa
+      pitch: 60,
+      bearing: -20,
       antialias: true
     });
 
-    // Adiciona controles de zoom e rotação 3D
     map.addControl(new maplibregl.NavigationControl());
 
-    // Exemplo: Marcador simulando um alerta de falta de luz
     map.on('load', () => {
       new maplibregl.Marker({ color: '#ff3b30' })
         .setLngLat([-54.0942, -25.2953])
