@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <title>Mapa 3D - Energia Medianeira PR</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <style>
+    html, body, #cesiumContainer {
+      width: 100%; height: 100%; margin: 0; padding: 0; overflow: hidden;
+      background: #0a0a0c; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    }
+    .hud-top {
+      position: fixed; top: 12px; left: 12px; right: 12px; z-index: 1000;
+      display: flex; justify-content: space-between; align-items: center;
+      pointer-events: none;
+    }
+    .badge {
+      background: rgba(15, 20, 28, 0.88); color: #fff; padding: 8px 14px;
+      border-radius: 10px; font-size: 13px; font-weight: 600;
+      border: 1px solid rgba(255,255,255,0.15); backdrop-filter: blur(8px);
+      pointer-events: auto;
+    }
+    .hud-bottom {
+      position: fixed; bottom: 20px; left: 12px; right: 12px; z-index: 1000;
+      display: flex; gap: 10px; justify-content: center; pointer-events: none;
+    }
+    button {
+      pointer-events: auto; border: none; border-radius: 12px;
+      padding: 12px 18px; font-size: 14px; font-weight: 700; cursor: pointer;
+      box-shadow: 0 4px 15px rgba(0,0,0,0.5); transition: transform 0.15s;
+    }
+    button:active { transform: scale(0.96); }
+    .btn-alert { background: #ef4444; color: #fff; }
+    .btn-center { background: rgba(30, 41, 59, 0.92); color: #fff; border: 1px solid rgba(255,255,255,0.2); }
+    .cesium-widget-credits { display: none !important; }
+  </style>
+</head>
+<body>
+  <div class="hud-top">
+    <div class="badge" id="statusBadge">Carregando 3D de Medianeira...</div>
+  </div>
+  <div id="cesiumContainer"></div>
+  <div class="hud-bottom">
+    <button class="btn-center" onclick="voarCentro()">🎯 Centro</button>
+    <button class="btn-alert" onclick="reportarSemLuz()">⚡ Estou sem luz aqui</button>
+  </div>
+
+  <script>
+    const statusBadge = document.getElementById('statusBadge');
+    const cesiumBase = 'https://' + 'cesium.com' + '/downloads/cesiumjs/releases/1.123/Build/Cesium/';
+
+    const linkCss = document.createElement('link');
+    linkCss.rel = 'stylesheet';
+    linkCss.href = cesiumBase + 'Widgets/widgets.css';
+    document.head.appendChild(linkCss);
+
+    const scriptJs = document.createElement('script');
+    scriptJs.src = cesiumBase + 'Cesium.js';
+    scriptJs.onload = iniciarCesium;
+    scriptJs.onerror = () => { statusBadge.innerText = 'Erro ao carregar motor 3D.'; };
+    document.head.appendChild(scriptJs);
+
+    let viewer;
+    const CENTRO_MEDIANEIRA = { lon: -54.0942, lat: -25.2953 };
+
+    async function iniciarCesium() {
+      try {
+        Cesium.Ion.defaultAccessToken = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJub25jZSI6Img5Yl9RdWJhbG42U00wRzQiLCJqdGkiOiI3NDQ0MDczMi04ZThiLTRhMjEtYjVkOS1mMzljN2I4NDQzMzkiLCJpZCI6NTU3MDU4LCJzdWIiOiJndWl6bjA0NSIsImlzcyI6Imh0dHBzOi8vYXBpLmNlc2l1bS5jb20iLCJhdWQiOiJNZWRpYW5laXJhICIsImlhdCI6MTc5NTY0Nzc3NH0.CltoCXqzosWQGmv___jzP5PK5wNY8a2ovncnln9RKyo';
+
+        viewer = new Cesium.Viewer('cesiumContainer', {
+          terrain: Cesium.Terrain.fromWorldTerrain(),
+          animation: false,
+          timeline: false,
+          baseLayerPicker: false,
+          geocoder: false,
+          homeButton: false,
+          sceneModePicker: false,
+          navigationHelpButton: false,
+          fullscreenButton: false,
+          selectionIndicator: false,
+          infoBox: false
+        });
+
+        const osmBuildings = await Cesium.createOsmBuildingsAsync();
+        viewer.scene.primitives.add(osmBuildings);
+
+        const maptilerUrl = 'https://' + 'api.maptiler.com' + '/maps/hybrid/256/{z}/{x}/{y}.jpg?key=PNYj1pP8GskSfr8S5GCz';
+        viewer.imageryLayers.addImageryProvider(
+          new Cesium.UrlTemplateImageryProvider({ url: maptilerUrl })
+        );
+
+        adicionarAlerta(CENTRO_MEDIANEIRA.lon, CENTRO_MEDIANEIRA.lat, 'Exemplo: Centro sem energia');
+        voarCentro();
+        statusBadge.innerText = '⚡ Medianeira - PR (Satélite + 3D)';
+      } catch (e) {
+        statusBadge.innerText = 'Erro 3D: ' + e.message;
+      }
+    }
+
+    function voarCentro() {
+      if (!viewer) return;
+      viewer.camera.flyTo({
+        destination: Cesium.Cartesian3.fromDegrees(CENTRO_MEDIANEIRA.lon, CENTRO_MEDIANEIRA.lat - 0.008, 650),
+        orientation: {
+          heading: Cesium.Math.toRadians(0),
+          pitch: Cesium.Math.toRadians(-35),
+          roll: 0.0
+        },
+        duration: 1.5
+      });
+    }
+
+    function adicionarAlerta(lon, lat, texto) {
+      viewer.entities.add({
+        position: Cesium.Cartesian3.fromDegrees(lon, lat, 10),
+        ellipse: {
+          semiMinorAxis: 120.0,
+          semiMajorAxis: 120.0,
+          material: Cesium.Color.RED.withAlpha(0.45),
+          outline: true,
+          outlineColor: Cesium.Color.RED,
+          heightReference: Cesium.HeightReference.CLAMP_TO_GROUND
+        },
+        point: {
+          pixelSize: 12,
+          color: Cesium.Color.RED,
+          outlineColor: Cesium.Color.WHITE,
+          outlineWidth: 2,
+          heightReference: Cesium.HeightReference.CLAMP_TO_GROUND
+        },
+        label: {
+          text: texto,
+          font: 'bold 13px sans-serif',
+          fillColor: Cesium.Color.WHITE,
+          outlineColor: Cesium.Color.BLACK,
+          outlineWidth: 3,
+          style: Cesium.LabelStyle.FILL_AND_OUTLINE,
+          verticalOrigin: Cesium.VerticalOrigin.BOTTOM,
+          pixelOffset: new Cesium.Cartesian2(0, -15),
+          heightReference: Cesium.HeightReference.CLAMP_TO_GROUND
+        }
+      });
+    }
+
+    function reportarSemLuz() {
+      if (!navigator.geolocation) {
+        alert('Seu navegador não suporta GPS.');
+        return;
+      }
+      statusBadge.innerText = 'Obtendo GPS...';
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
+          const lon = pos.coords.longitude;
+          const lat = pos.coords.latitude;
+          adicionarAlerta(lon, lat, '⚡ Sem luz reportada agora');
+          viewer.camera.flyTo({
+            destination: Cesium.Cartesian3.fromDegrees(lon, lat - 0.005, 450),
+            orientation: { heading: 0, pitch: Cesium.Math.toRadians(-40), roll: 0 }
+          });
+          statusBadge.innerText = '✅ Alerta marcado no mapa!';
+        },
+        () => {
+          statusBadge.innerText = '⚠️ Permita o acesso ao GPS no navegador.';
+        },
+        { enableHighAccuracy: true }
+      );
+    }
+  </script>
+</body>
+</html>
