@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <title>Mapa 3D Satélite - Energia Medianeira PR</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <style>
+    body { margin: 0; background: #111; color: #fff; font-family: sans-serif; overflow: hidden; }
+    #map { position: fixed; inset: 0; width: 100vw; height: 100vh; }
+    #status { position: fixed; top: 10px; left: 10px; z-index: 999; background: rgba(0,0,0,0.85); padding: 8px 12px; border-radius: 6px; font-size: 13px; border: 1px solid #333; max-width: 80vw; }
+  </style>
+</head>
+<body>
+  <div id="status">Carregando Satélite 3D de Medianeira...</div>
+  <div id="map"></div>
+
+  <script>
+    const statusEl = document.getElementById('status');
+    const apiKey = 'PNYj1pP8GskSfr8S5GCz';
+    const cdnBase = 'https://' + 'unpkg.com' + '/maplibre-gl@4.7.1/dist/';
+
+    const linkCss = document.createElement('link');
+    linkCss.rel = 'stylesheet';
+    linkCss.href = cdnBase + 'maplibre-gl.css';
+    document.head.appendChild(linkCss);
+
+    const scriptJs = document.createElement('script');
+    scriptJs.src = cdnBase + 'maplibre-gl.js';
+    scriptJs.onload = iniciarMapa;
+    scriptJs.onerror = () => { statusEl.innerText = 'Erro ao carregar MapLibre.'; };
+    document.head.appendChild(scriptJs);
+
+    function iniciarMapa() {
+      const styleUrl = 'https://' + 'api.maptiler.com' + '/maps/hybrid/style.json?key=' + apiKey;
+
+      const map = new maplibregl.Map({
+        container: 'map',
+        style: styleUrl,
+        center: [-54.0942, -25.2953],
+        zoom: 16,
+        pitch: 62,
+        bearing: -20,
+        antialias: true
+      });
+
+      map.addControl(new maplibregl.NavigationControl());
+
+      map.on('load', () => {
+        statusEl.innerText = 'Medianeira - PR (Satélite 3D Ativo)';
+
+        const layers = map.getStyle().layers;
+        let labelLayerId;
+        for (let i = 0; i < layers.length; i++) {
+          if (layers[i].type === 'symbol' && layers[i].layout && layers[i].layout['text-field']) {
+            labelLayerId = layers[i].id;
+            break;
+          }
+        }
+
+        if (map.getSource('openmaptiles')) {
+          map.addLayer({
+            id: 'predios-3d',
+            source: 'openmaptiles',
+            'source-layer': 'building',
+            type: 'fill-extrusion',
+            minzoom: 14,
+            paint: {
+              'fill-extrusion-color': '#cbd5e1',
+              'fill-extrusion-height': ['coalesce', ['get', 'render_height'], 10],
+              'fill-extrusion-base': ['coalesce', ['get', 'render_min_height'], 0],
+              'fill-extrusion-opacity': 0.75
+            }
+          }, labelLayerId);
+        }
+
+        new maplibregl.Marker({ color: '#ff3b30' })
+          .setLngLat([-54.0942, -25.2953])
+          .setPopup(new maplibregl.Popup().setHTML('<b>Alerta:</b> Falta de luz reportada aqui'))
+          .addTo(map);
+      });
+
+      map.on('error', (e) => {
+        if (e && e.error && e.error.message) {
+          statusEl.innerText = 'Aviso: ' + e.error.message;
+        }
+      });
+    }
+  </script>
+</body>
+</html>
