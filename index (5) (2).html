@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <title>Mapa 3D - Energia Medianeira PR</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <style>
+    html, body { margin: 0; padding: 0; width: 100%; height: 100%; background: #0f172a; color: #fff; font-family: sans-serif; overflow: hidden; }
+    #map { position: fixed; inset: 0; width: 100vw; height: 100vh; }
+    #status { position: fixed; top: 12px; left: 12px; z-index: 999; background: rgba(15, 23, 42, 0.9); padding: 8px 14px; border-radius: 8px; font-size: 13px; border: 1px solid #334155; box-shadow: 0 4px 12px rgba(0,0,0,0.4); }
+  </style>
+</head>
+<body>
+  <div id="status">Carregando ruas e prédios 3D...</div>
+  <div id="map"></div>
+
+  <script>
+    const statusEl = document.getElementById('status');
+    const cdnBase = 'https://' + 'unpkg.com' + '/maplibre-gl@4.7.1/dist/';
+
+    const linkCss = document.createElement('link');
+    linkCss.rel = 'stylesheet';
+    linkCss.href = cdnBase + 'maplibre-gl.css';
+    document.head.appendChild(linkCss);
+
+    const scriptJs = document.createElement('script');
+    scriptJs.src = cdnBase + 'maplibre-gl.js';
+    scriptJs.onload = iniciarMapa;
+    document.head.appendChild(scriptJs);
+
+    function iniciarMapa() {
+      const styleUrl = 'https://' + 'tiles.openfreemap.org' + '/styles/dark';
+
+      const map = new maplibregl.Map({
+        container: 'map',
+        style: styleUrl,
+        center: [-54.0942, -25.2953],
+        zoom: 15.8,
+        pitch: 60,
+        bearing: -20,
+        antialias: true
+      });
+
+      map.addControl(new maplibregl.NavigationControl(), 'top-right');
+
+      map.on('load', () => {
+        statusEl.innerText = 'Medianeira - PR (3D Ativo)';
+        new maplibregl.Marker({ color: '#ff3b30' })
+          .setLngLat([-54.0942, -25.2953])
+          .setPopup(new maplibregl.Popup().setHTML('<b>Alerta:</b> Falta de luz reportada aqui'))
+          .addTo(map);
+      });
+    }
+  </script>
+</body>
+</html>
