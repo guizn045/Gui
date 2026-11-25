@@ -1,0 +1,325 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<meta name="theme-color" content="#0b1220">
+<title>Luz Medianeira · mapa de energia</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/maplibre-gl@4.7.1/dist/maplibre-gl.css">
+<style>
+  :root{
+    --bg:#0b1220; --card:rgba(13,20,34,.94); --line:rgba(255,255,255,.10);
+    --tx:#f1f5f9; --mut:#94a3b8; --red:#ef4444; --amb:#f59e0b; --grn:#22c55e; --acc:#38bdf8;
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html,body{margin:0;height:100%;background:var(--bg);color:var(--tx);overflow:hidden;
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Inter,sans-serif}
+  #map{position:fixed;inset:0}
+  .maplibregl-ctrl-top-left{margin-top:calc(env(safe-area-inset-top,0px) + 62px)}
+  .maplibregl-ctrl-attrib{font-size:10px}
+
+  .top{position:fixed;z-index:5;left:12px;right:12px;top:calc(env(safe-area-inset-top,0px) + 10px);
+    display:flex;justify-content:space-between;align-items:center;gap:8px;pointer-events:none}
+  .pill{pointer-events:auto;background:var(--card);border:1px solid var(--line);border-radius:999px;
+    padding:9px 14px;font-size:13px;font-weight:700;display:flex;align-items:center;gap:8px}
+  .dot{width:8px;height:8px;border-radius:50%;background:var(--grn);box-shadow:0 0 0 0 rgba(34,197,94,.6);animation:p 2s infinite}
+  .demo .dot{background:var(--amb);animation:none}
+  @keyframes p{70%{box-shadow:0 0 0 7px rgba(34,197,94,0)}100%{box-shadow:0 0 0 0 rgba(34,197,94,0)}}
+  .tag{font-size:11px;font-weight:800;letter-spacing:.04em;color:#1c1917;background:var(--amb);padding:4px 9px;border-radius:999px;display:none;pointer-events:auto}
+  .demo .tag{display:block}
+
+  .tools{position:fixed;z-index:5;right:12px;top:calc(env(safe-area-inset-top,0px) + 64px);display:flex;flex-direction:column;gap:8px}
+  .tools button{width:46px;height:46px;border-radius:14px;border:1px solid var(--line);background:var(--card);
+    color:var(--tx);font-size:11px;font-weight:800;letter-spacing:.02em}
+  .tools button.on{background:var(--acc);color:#04202e;border-color:var(--acc)}
+
+  .sheet{position:fixed;z-index:6;left:0;right:0;bottom:0;background:var(--card);border-top:1px solid var(--line);
+    border-radius:20px 20px 0 0;padding:8px 14px calc(env(safe-area-inset-bottom,0px) + 14px);
+    max-height:62vh;display:flex;flex-direction:column;transition:transform .25s}
+  .handle{width:42px;height:5px;border-radius:9px;background:rgba(255,255,255,.22);margin:2px auto 10px}
+  .stats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+  .stat{background:rgba(255,255,255,.05);border-radius:12px;padding:9px 10px}
+  .stat b{display:block;font-size:22px;line-height:1.1}
+  .stat span{font-size:11px;color:var(--mut)}
+  .meta{font-size:11.5px;color:var(--mut);margin:9px 2px 10px}
+  .actions{display:flex;gap:8px}
+  .actions button{flex:1;border:0;border-radius:14px;padding:14px 10px;font-size:14px;font-weight:800}
+  .b-sec{background:rgba(255,255,255,.08);color:var(--tx);flex:.45!important}
+  .b-red{background:var(--red);color:#fff}
+  .b-red:disabled{opacity:.55}
+  .list{overflow:auto;margin-top:12px;display:none;-webkit-overflow-scrolling:touch}
+  .open .list{display:block}
+  .item{display:flex;gap:10px;align-items:center;padding:11px 4px;border-top:1px solid var(--line)}
+  .item i{width:10px;height:10px;border-radius:50%;flex:none}
+  .item div{flex:1;min-width:0}
+  .item strong{font-size:13.5px;display:block}
+  .item small{color:var(--mut);font-size:11.5px}
+  .help{font-size:11.5px;color:var(--mut);padding:12px 4px 2px;line-height:1.5}
+  .help a{color:var(--acc);text-decoration:none;font-weight:700}
+  .empty{padding:16px 4px;color:var(--mut);font-size:13px}
+
+  .toast{position:fixed;z-index:9;left:50%;transform:translate(-50%,20px);bottom:calc(env(safe-area-inset-bottom,0px) + 190px);
+    background:#e2e8f0;color:#0f172a;font-size:13px;font-weight:700;padding:10px 16px;border-radius:12px;opacity:0;
+    transition:.25s;pointer-events:none;max-width:88vw;text-align:center}
+  .toast.show{opacity:1;transform:translate(-50%,0)}
+  .maplibregl-popup-content{background:#0f172a;color:var(--tx);border-radius:12px;padding:10px 12px;font-size:12.5px;border:1px solid var(--line)}
+  .maplibregl-popup-tip{border-top-color:#0f172a!important;border-bottom-color:#0f172a!important}
+</style>
+</head>
+<body>
+<div id="map"></div>
+
+<div class="top" id="top">
+  <div class="pill"><span class="dot"></span>Luz Medianeira</div>
+  <div class="tag" id="tagTxt"></div>
+</div>
+
+<div class="tools">
+  <button id="b3d" class="on">3D</button>
+  <button id="bsat">SAT</button>
+  <button id="brel">RELEVO</button>
+  <button id="bnorte">N</button>
+</div>
+
+<div class="sheet" id="sheet">
+  <div class="handle" id="handle"></div>
+  <div class="stats">
+    <div class="stat"><b id="nAtivos" style="color:var(--red)">0</b><span>Sem luz</span></div>
+    <div class="stat"><b id="nAtend" style="color:var(--amb)">0</b><span>Em atendimento</span></div>
+    <div class="stat"><b id="nOk" style="color:var(--grn)">0</b><span>Restabelecidos</span></div>
+  </div>
+  <div class="meta" id="meta">Carregando…</div>
+  <div class="actions">
+    <button class="b-sec" id="bCentro">Centro</button>
+    <button class="b-red" id="bReport">⚡ Estou sem luz aqui</button>
+  </div>
+  <div class="list" id="list"></div>
+</div>
+<div class="toast" id="toast"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
+<script>
+/* ============ CONFIG ============ */
+const CENTRO = [-54.0942, -25.2953];            // Medianeira - PR
+const LIMITES = [[-54.30, -25.45], [-53.90, -25.15]];
+const API_URL = '/api/apagoes';                 // quando existir uma fonte real, é só responder aqui (veja README no chat)
+const ATUALIZA_MS = 60000;                      // atualização a cada 60 s (pausa com a aba em segundo plano)
+const STORE = 'luz-medianeira:v1';
+const COR = { reportado:'#ef4444', atendimento:'#f59e0b', restabelecido:'#22c55e' };
+const ROTULO = { reportado:'Sem luz', atendimento:'Em atendimento', restabelecido:'Restabelecido' };
+
+/* ============ DADOS ============ */
+// Formato esperado da API: [{id, lon, lat, status:'reportado'|'atendimento'|'restabelecido', ts:ISO, fonte:'copel'|'usuario', local:'texto opcional'}]
+function rng(seed){ return () => (seed = (seed * 16807) % 2147483647) / 2147483647; }
+
+function gerarDemo(){
+  const r = rng(20261125), agora = Date.now(), out = [];
+  const focos = [[-0.006, 0.004, 9, 'Região norte'], [0.008, -0.005, 6, 'Região leste'], [-0.003, -0.009, 4, 'Região sul']];
+  let n = 0;
+  focos.forEach(([dx, dy, qtd, nome]) => {
+    for (let i = 0; i < qtd; i++){
+      const s = r();
+      out.push({
+        id: 'demo' + (n++), lon: CENTRO[0] + dx + (r() - .5) * .006, lat: CENTRO[1] + dy + (r() - .5) * .005,
+        status: s < .18 ? 'restabelecido' : s < .55 ? 'atendimento' : 'reportado',
+        ts: new Date(agora - r() * 3 * 3600e3).toISOString(), fonte: 'demo', local: nome + ' (demo)'
+      });
+    }
+  });
+  return out;
+}
+const MODO_DEMO = new URLSearchParams(location.search).has('demo');   // abra o site com ?demo=1 para ver dados de teste
+const DEMO = MODO_DEMO ? gerarDemo() : [];
+
+function lerUsuario(){
+  try {
+    const v = JSON.parse(localStorage.getItem(STORE) || '[]');
+    return v.filter(x => Date.now() - new Date(x.ts) < 6 * 3600e3);
+  } catch { return []; }
+}
+function salvarUsuario(lista){ try { localStorage.setItem(STORE, JSON.stringify(lista)); } catch {} }
+
+let ocorrencias = [], fonteReal = false, ultimaAtualizacao = Date.now();
+
+async function carregar(){
+  let lista = null;
+  try {
+    const r = await fetch(API_URL, { cache: 'no-store' });
+    if (r.ok) { const j = await r.json(); if (Array.isArray(j)) lista = j; }
+  } catch {}
+  fonteReal = !!lista;
+  ocorrencias = (lista || DEMO).concat(lerUsuario());
+  ultimaAtualizacao = Date.now();
+  const aviso = fonteReal ? '' : MODO_DEMO ? 'DADOS DE DEMONSTRAÇÃO' : 'SEM FONTE OFICIAL CONECTADA';
+  document.getElementById('tagTxt').textContent = aviso;
+  document.getElementById('top').classList.toggle('demo', !fonteReal);
+  desenhar();
+}
+
+/* ============ MAPA ============ */
+const map = new maplibregl.Map({
+  container: 'map',
+  style: 'https://tiles.openfreemap.org/styles/liberty',   // vetorial, gratuito, sem chave, com prédios 3D
+  center: CENTRO, zoom: 14.8, pitch: 58, bearing: -17,
+  maxPitch: 70, minZoom: 11, maxZoom: 19.5, maxBounds: LIMITES,
+  antialias: false, fadeDuration: 0, pixelRatio: Math.min(window.devicePixelRatio || 1, 2),
+  attributionControl: false
+});
+map.addControl(new maplibregl.AttributionControl({ compact: true }), 'top-left');
+
+function geojson(){
+  return {
+    type: 'FeatureCollection',
+    features: ocorrencias.filter(o => o.status !== 'restabelecido').map(o => ({
+      type: 'Feature', geometry: { type: 'Point', coordinates: [o.lon, o.lat] },
+      properties: { id: o.id, status: o.status, ts: o.ts, fonte: o.fonte || '', local: o.local || '' }
+    }))
+  };
+}
+
+map.on('load', () => {
+  map.addSource('dem', { type: 'raster-dem', encoding: 'terrarium', tileSize: 256, maxzoom: 15,
+    tiles: ['https://s3.amazonaws.com/elevation-tiles-prod/terrarium/{z}/{x}/{y}.png'] });
+  map.addSource('sat', { type: 'raster', tileSize: 256, maxzoom: 19,
+    attribution: 'Imagem © Esri',
+    tiles: ['https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}'] });
+
+  // satélite entra logo abaixo das ruas/prédios, então prédios 3D e rótulos continuam por cima
+  const primeira = map.getStyle().layers.find(l => ['line', 'symbol', 'fill-extrusion'].includes(l.type));
+  map.addLayer({ id: 'sat', type: 'raster', source: 'sat', layout: { visibility: 'none' } }, primeira && primeira.id);
+
+  map.addSource('oc', { type: 'geojson', data: geojson(), cluster: true, clusterRadius: 38, clusterMaxZoom: 16 });
+  map.addSource('oc-calor', { type: 'geojson', data: geojson() });
+
+  const cor = ['match', ['get', 'status'], 'atendimento', COR.atendimento, COR.reportado];
+
+  // mancha de calor discreta (só no zoom de longe)
+  map.addLayer({ id: 'calor', type: 'heatmap', source: 'oc-calor', maxzoom: 15.5, paint: {
+    'heatmap-radius': ['interpolate', ['linear'], ['zoom'], 11, 14, 15, 30],
+    'heatmap-intensity': 1.1,
+    'heatmap-opacity': ['interpolate', ['linear'], ['zoom'], 13, .8, 15.5, 0],
+    'heatmap-color': ['interpolate', ['linear'], ['heatmap-density'], 0, 'rgba(239,68,68,0)', .3, 'rgba(245,158,11,.55)', .7, 'rgba(239,68,68,.8)', 1, 'rgba(185,28,28,.95)']
+  }});
+
+  // halo de ~35 m no chão (cresce com o zoom, nunca vira "área gigante")
+  map.addLayer({ id: 'halo', type: 'circle', source: 'oc', filter: ['!', ['has', 'point_count']], paint: {
+    'circle-radius': ['interpolate', ['exponential', 2], ['zoom'], 12, 1, 19, 128],
+    'circle-color': cor, 'circle-opacity': .28, 'circle-pitch-alignment': 'map', 'circle-pitch-scale': 'map'
+  }});
+  map.addLayer({ id: 'ponto', type: 'circle', source: 'oc', filter: ['!', ['has', 'point_count']], paint: {
+    'circle-radius': ['interpolate', ['linear'], ['zoom'], 12, 3.5, 17, 7, 19, 10],
+    'circle-color': cor, 'circle-stroke-color': '#fff', 'circle-stroke-width': 2
+  }});
+
+  // agrupamento: vários chamados próximos viram um único número
+  map.addLayer({ id: 'grupo', type: 'circle', source: 'oc', filter: ['has', 'point_count'], paint: {
+    'circle-radius': ['step', ['get', 'point_count'], 16, 5, 21, 15, 27],
+    'circle-color': '#ef4444', 'circle-opacity': .9, 'circle-stroke-color': '#fff', 'circle-stroke-width': 2
+  }});
+  map.addLayer({ id: 'grupo-n', type: 'symbol', source: 'oc', filter: ['has', 'point_count'],
+    layout: { 'text-field': ['get', 'point_count_abbreviated'], 'text-font': ['Noto Sans Bold'], 'text-size': 13, 'text-allow-overlap': true },
+    paint: { 'text-color': '#fff' } });
+
+  map.on('click', 'grupo', e => {
+    const f = e.features[0];
+    map.getSource('oc').getClusterExpansionZoom(f.properties.cluster_id).then(z =>
+      map.easeTo({ center: f.geometry.coordinates, zoom: Math.min(z + .5, 18.5), duration: 600 }));
+  });
+  map.on('click', 'ponto', e => {
+    const p = e.features[0].properties;
+    new maplibregl.Popup({ offset: 14, closeButton: false })
+      .setLngLat(e.features[0].geometry.coordinates)
+      .setHTML(`<b>${ROTULO[p.status] || p.status}</b><br>${p.local ? p.local + '<br>' : ''}<span style="color:#94a3b8">${haQuanto(p.ts)}${p.fonte === 'usuario' ? ' · reportado por morador' : ''}</span>`)
+      .addTo(map);
+  });
+
+  carregar();
+});
+
+function desenhar(){
+  if (map.getSource('oc')) { map.getSource('oc').setData(geojson()); map.getSource('oc-calor').setData(geojson()); }
+  const ativos = ocorrencias.filter(o => o.status === 'reportado').length;
+  const atend = ocorrencias.filter(o => o.status === 'atendimento').length;
+  const ok = ocorrencias.filter(o => o.status === 'restabelecido').length;
+  nAtivos.textContent = ativos; nAtend.textContent = atend; nOk.textContent = ok;
+  meta.textContent = (fonteReal ? 'Fonte oficial conectada' : MODO_DEMO ? 'Modo demonstração' : 'Mostrando só relatos deste aparelho; ainda sem dados oficiais') + ' · atualizado ' + haQuanto(new Date(ultimaAtualizacao).toISOString());
+
+  const ord = ocorrencias.slice().sort((a, b) => new Date(b.ts) - new Date(a.ts));
+  list.innerHTML = (ord.length ? ord.map(o => `
+    <div class="item" data-id="${o.id}">
+      <i style="background:${COR[o.status]}"></i>
+      <div><strong>${o.local || 'Ocorrência'}</strong><small>${ROTULO[o.status]} · ${haQuanto(o.ts)}${o.fonte === 'usuario' ? ' · relato de morador' : ''}</small></div>
+    </div>`).join('') : (fonteReal ? '<div class="empty">Nenhuma ocorrência informada pela fonte neste momento.</div>' : '<div class="empty">Nada para mostrar aqui. Atenção: sem fonte oficial conectada, isso <b>não</b> significa que há luz em toda a cidade.</div>')) + `
+    <div class="help">Falta de luz também pode ser informada à Copel: <a href="tel:08005100116">0800 51 00 116</a> ·
+    <a href="https://wa.me/554130138973">WhatsApp (41) 3013-8973</a> · <a href="https://www.copel.com">copel.com</a></div>`;
+}
+
+function haQuanto(iso){
+  const m = Math.max(0, Math.round((Date.now() - new Date(iso)) / 60000));
+  if (m < 1) return 'agora';
+  if (m < 60) return 'há ' + m + ' min';
+  const h = Math.floor(m / 60);
+  return 'há ' + h + (h === 1 ? ' hora' : ' horas');
+}
+
+/* ============ CONTROLES ============ */
+const $ = id => document.getElementById(id);
+const nAtivos = $('nAtivos'), nAtend = $('nAtend'), nOk = $('nOk'), meta = $('meta'), list = $('list'), sheet = $('sheet');
+
+function toast(t){ const el = $('toast'); el.textContent = t; el.classList.add('show'); clearTimeout(toast.t); toast.t = setTimeout(() => el.classList.remove('show'), 3200); }
+
+$('b3d').onclick = e => {
+  const tilt = map.getPitch() < 10;
+  map.easeTo({ pitch: tilt ? 58 : 0, duration: 700 });
+  e.currentTarget.classList.toggle('on', tilt);
+};
+$('bsat').onclick = e => {
+  const on = map.getLayoutProperty('sat', 'visibility') !== 'visible';
+  map.setLayoutProperty('sat', 'visibility', on ? 'visible' : 'none');
+  e.currentTarget.classList.toggle('on', on);
+};
+$('brel').onclick = e => {
+  const on = !map.getTerrain();
+  map.setTerrain(on ? { source: 'dem', exaggeration: 1.3 } : null);
+  e.currentTarget.classList.toggle('on', on);
+};
+$('bnorte').onclick = () => map.easeTo({ bearing: 0, duration: 500 });
+$('bCentro').onclick = () => map.flyTo({ center: CENTRO, zoom: 14.8, pitch: 58, bearing: -17, duration: 1400 });
+
+$('handle').onclick = () => sheet.classList.toggle('open');
+list.addEventListener('click', e => {
+  const it = e.target.closest('.item'); if (!it) return;
+  const o = ocorrencias.find(x => x.id === it.dataset.id); if (!o) return;
+  sheet.classList.remove('open');
+  map.flyTo({ center: [o.lon, o.lat], zoom: 17.2, pitch: 60, duration: 1200 });
+});
+
+$('bReport').onclick = () => {
+  const btn = $('bReport');
+  const ult = lerUsuario().filter(x => x.fonte === 'usuario').pop();
+  if (ult && Date.now() - new Date(ult.ts) < 10 * 60e3) return toast('Você já informou há pouco. Aguarde alguns minutos.');
+  if (!navigator.geolocation) return toast('Seu navegador não permite usar o GPS.');
+  btn.disabled = true; btn.textContent = 'Buscando GPS…';
+  navigator.geolocation.getCurrentPosition(pos => {
+    btn.disabled = false; btn.textContent = '⚡ Estou sem luz aqui';
+    const { longitude: lon, latitude: lat } = pos.coords;
+    if (lon < LIMITES[0][0] || lon > LIMITES[1][0] || lat < LIMITES[0][1] || lat > LIMITES[1][1])
+      return toast('Você parece estar fora da região de Medianeira.');
+    const novo = { id: 'u' + Date.now(), lon, lat, status: 'reportado', ts: new Date().toISOString(), fonte: 'usuario', local: 'Relato de morador' };
+    salvarUsuario(lerUsuario().concat(novo));
+    try { fetch(API_URL + '/relato', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(novo) }).catch(() => {}); } catch {}
+    ocorrencias.push(novo); desenhar();
+    map.flyTo({ center: [lon, lat], zoom: 17, pitch: 60, duration: 1200 });
+    toast('Registrado no mapa. Para atendimento, avise também a Copel.');
+  }, () => {
+    btn.disabled = false; btn.textContent = '⚡ Estou sem luz aqui';
+    toast('Não consegui pegar sua localização. Libere o GPS para o site.');
+  }, { enableHighAccuracy: true, timeout: 12000, maximumAge: 30000 });
+};
+
+/* atualização automática: só roda com a tela visível (poupa bateria) */
+let timer = setInterval(() => { if (!document.hidden && map.loaded()) carregar(); }, ATUALIZA_MS);
+document.addEventListener('visibilitychange', () => { if (!document.hidden && map.loaded()) carregar(); });
+</script>
+</body>
+</html>
